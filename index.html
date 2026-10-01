@@ -37,6 +37,7 @@
   .drop.over{background:rgba(80,128,255,.24)}
   .drop b{font-size:15px; color:var(--accent)}
   .drop span{font-size:12px; color:var(--muted)}
+  .drop .pickfile{color:var(--accent); text-decoration:underline}
   .drop kbd{font:inherit; border:1px solid var(--line); border-bottom-width:2px; border-radius:3px; padding:0 5px; background:#fff; color:var(--ink)}
   .status{font-size:12.5px; color:var(--muted); min-height:18px; margin-top:10px}
   .head1{display:flex; align-items:baseline; justify-content:space-between; gap:12px}
@@ -135,10 +136,10 @@
       <button type="button" class="change" id="change" hidden>Change chart</button>
     </div>
     <div class="body1" id="body1">
-    <p class="hint">On the BoM low-level chart (1000FT to FL140, SA), right-click the image and choose <b>Copy Image</b>, then paste here.</p>
-    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Paste, drop or choose the GPWT chart image">
-      <b>Paste chart here</b>
-      <span><kbd>⌘</kbd> <kbd>V</kbd> &nbsp;or&nbsp; <kbd>Ctrl</kbd> <kbd>V</kbd> &nbsp;·&nbsp; or drop / click to choose a file</span>
+    <p class="hint">On the BoM low-level chart (1000FT to FL140, SA), right-click the image and choose <b>Copy Image</b>, then click the box below.</p>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Click to paste the GPWT chart from the clipboard">
+      <b>Click to paste chart</b>
+      <span>or <kbd>⌘</kbd> <kbd>V</kbd> / <kbd>Ctrl</kbd> <kbd>V</kbd> &nbsp;·&nbsp; drop an image &nbsp;·&nbsp; <a href="#" class="pickfile" id="pickfile">choose a file</a></span>
     </div>
     <input type="file" id="file" accept="image/*" hidden>
     </div>
@@ -794,8 +795,26 @@ document.addEventListener("paste", function(e){
   show("No image on the clipboard. On the BoM page, right-click the chart and choose Copy Image.", "bad");
 });
 var drop = $("drop");
-drop.addEventListener("click", function(){ $("file").click(); });
-drop.addEventListener("keydown", function(e){ if (e.key === "Enter" || e.key === " "){ e.preventDefault(); $("file").click(); } });
+/* one click: read the image straight from the clipboard (needs https; Chrome asks once, Safari shows a Paste bubble) */
+async function pasteFromClipboard(){
+  if (!navigator.clipboard || !navigator.clipboard.read || !window.isSecureContext){
+    show("This browser can't read the clipboard on a click. Press \u2318V / Ctrl+V instead.", "bad"); return;
+  }
+  try {
+    var items = await navigator.clipboard.read();
+    for (var i = 0; i < items.length; i++){
+      var t = items[i].types.find(function(x){ return x.indexOf("image/") === 0; });
+      if (t){ loadBlob(await items[i].getType(t)); return; }
+    }
+    show("No image on the clipboard. On the BoM page, right-click the chart and choose Copy Image.", "bad");
+  } catch (err){
+    if (err && err.name === "NotAllowedError") show("Clipboard access was blocked. Allow it for this page, or press \u2318V / Ctrl+V.", "bad");
+    else show("Couldn't read the clipboard. Press \u2318V / Ctrl+V instead.", "bad");
+  }
+}
+drop.addEventListener("click", function(){ pasteFromClipboard(); });
+drop.addEventListener("keydown", function(e){ if (e.key === "Enter" || e.key === " "){ e.preventDefault(); pasteFromClipboard(); } });
+$("pickfile").addEventListener("click", function(e){ e.preventDefault(); e.stopPropagation(); $("file").click(); });
 $("file").addEventListener("change", function(){ if (this.files[0]) loadBlob(this.files[0]); this.value = ""; });
 ["dragenter", "dragover"].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add("over"); }); });
 ["dragleave", "drop"].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove("over"); }); });
