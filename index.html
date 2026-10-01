@@ -354,7 +354,8 @@ function match(D, x, y, bank){
     .sort(function(p, q){ return p.e - q.e || (p.ch < q.ch ? -1 : 1); });
   if (!ranked.length) return { ch: "?", err: 1, margin: 0, hid: 1 };
   var top = ranked[0];
-  return { ch: top.ch, err: top.e, margin: ranked.length > 1 ? ranked[1].e - top.e : 1, hid: top.hid };
+  return { ch: top.ch, err: top.e, margin: ranked.length > 1 ? ranked[1].e - top.e : 1, hid: top.hid,
+           alts: ranked.slice(0, 3).map(function(r){ return { ch: r.ch, e: r.e }; }) };
 }
 
 function signOf(D, bx, y){
@@ -387,7 +388,121 @@ function readBox(D, bx, by, bh){
     }
     out.push({ missing: false, sign: sign, digits: digits, y: y });
   }
+  return neighbourCheck(out);
+}
+
+/* ---------- neighbour check ----------
+   Only digits that are already flagged may change, and they stay flagged.
+   Speed and temperature: the guess is nudged toward the confident levels above and below.
+   Direction: the whole column is solved together, so a smooth wind profile is preferred, but a jump
+   costs at most 60 degrees (real wind shifts stay possible) and light winds get little or no help. */
+var NB = { K: 3, DELTA: 0.012, LAM_DIR: 0.002, LAM_S: 0.0004, LAM_T: 0.0015, CAP: 60, KT0: 5, KT1: 20 };
+var LV = [14000, 10000, 7000, 5000, 2000, 1000];
+var FCELLS = { dir: [0, 1], spd: [2, 3, 4], temp: [5, 6] };
+function isDigit(c){ return c.length === 1 && c >= "0" && c <= "9"; }
+function nbCands(d){
+  if (!d.flag) return [{ ch: d.ch, c: 0 }];
+  if (!d.alts || !d.alts.length) return [];
+  var best = d.alts[0].e, out = [];
+  d.alts.slice(0, NB.K).forEach(function(a){ if (a.e - best <= NB.DELTA && isDigit(a.ch)) out.push({ ch: a.ch, c: a.e - best }); });
   return out;
+}
+function angDiff(a, b){ return Math.abs((((a - b + 180) % 360) + 360) % 360 - 180); }
+function lineVal(l, f){
+  var s = FCELLS[f].map(function(j){ return l.digits[j].ch; }).join("");
+  if (!/^[0-9]+$/.test(s)) return null;
+  var v = parseInt(s, 10);
+  if (f === "dir") return v * 10;
+  if (f === "temp" && l.sign === "-") return -v;
+  return v;
+}
+function setCells(l, cells, s){
+  cells.forEach(function(j, k){
+    var d = l.digits[j];
+    if (s[k] !== d.ch){ d.ch = s[k]; d.margin = 0; d.flag = true; }
+  });
+  l.checked = true;
+}
+function neighbourCheck(lines){
+  var snap = lines.map(function(l){ return l.missing ? null : { dir: lineVal(l, "dir"), spd: lineVal(l, "spd"), temp: lineVal(l, "temp") }; });
+  lines.forEach(function(l, i){
+    if (l.missing) return;
+    var nb = [i - 1, i + 1].filter(function(j){ return j >= 0 && j < 6 && snap[j]; });
+    if (!nb.length) return;
+    ["spd", "temp"].forEach(function(f){
+      var cells = FCELLS[f];
+      if (!cells.some(function(j){ return l.digits[j].flag; })) return;
+      var good = nb.filter(function(j){ return snap[j][f] !== null && !cells.some(function(k){ return lines[j].digits[k].flag; }); });
+      if (good.length < 1 || good.length < nb.length) return;          // every neighbour must be sure of itself
+      var vals = good.map(function(j){ return snap[j][f]; }), exp;
+      if (f === "temp" && nb.length === 2 && vals.length === 2){
+        var h1 = LV[nb[0]], t1 = snap[nb[0]].temp, h2 = LV[nb[1]], t2 = snap[nb[1]].temp;
+        exp = t1 + (t2 - t1) * (LV[i] - h1) / (h2 - h1);
+      } else exp = vals.reduce(function(a, b){ return a + b; }, 0) / vals.length;
+      var opts = [{ s: "", c: 0 }];
+      cells.forEach(function(j){
+        var cs = nbCands(l.digits[j]), nx = [];
+        opts.forEach(function(o){ cs.forEach(function(c){ nx.push({ s: o.s + c.ch, c: o.c + c.c }); }); });
+        opts = nx;
+      });
+      var best = null;
+      opts.forEach(function(o){
+        var v = parseInt(o.s, 10), cost = o.c;
+        if (f === "spd") cost += NB.LAM_S * Math.abs(v - exp);
+        else { if (l.sign === "-") v = -v; cost += NB.LAM_T * Math.abs(v - exp); }
+        if (best === null || cost < best.c) best = { c: cost, s: o.s };
+      });
+      var cur = cells.map(function(j){ return l.digits[j].ch; }).join("");
+      if (best && best.s !== cur) setCells(l, cells, best.s);
+    });
+  });
+  return dirChain(lines);
+}
+function dirStates(l){
+  var out = [];
+  nbCands(l.digits[0]).forEach(function(a){ nbCands(l.digits[1]).forEach(function(b){
+    var v = parseInt(a.ch + b.ch, 10);
+    if (v <= 36) out.push({ deg: v * 10, e: a.c + b.c, s: a.ch + b.ch });
+  }); });
+  return out;
+}
+function kWeight(s){ return s === null ? 0 : Math.max(0, Math.min(1, (s - NB.KT0) / (NB.KT1 - NB.KT0))); }
+function dirChain(lines){
+  var i = 0;
+  while (i < 6){
+    if (lines[i].missing){ i++; continue; }
+    var j = i;
+    while (j + 1 < 6 && !lines[j + 1].missing) j++;
+    var seg = []; for (var k = i; k <= j; k++) seg.push(k);
+    i = j + 1;
+    var S = seg.map(function(k){ return dirStates(lines[k]); });
+    if (S.some(function(s){ return !s.length; }) || S.every(function(s){ return s.length === 1; })) continue;
+    var spd = seg.map(function(k){ return lineVal(lines[k], "spd"); });
+    var cost = [S[0].map(function(st){ return st.e; })], back = [];
+    for (var n = 1; n < seg.length; n++){
+      var w = NB.LAM_DIR / 10 * Math.min(kWeight(spd[n - 1]), kWeight(spd[n]));
+      var prev = cost[cost.length - 1], row = [], bk = [];
+      S[n].forEach(function(st){
+        var bi = 0, bv = null;
+        for (var p = 0; p < S[n - 1].length; p++){
+          var v = prev[p] + w * Math.min(angDiff(st.deg, S[n - 1][p].deg), NB.CAP);
+          if (bv === null || v < bv){ bv = v; bi = p; }
+        }
+        row.push(prev[bi] + w * Math.min(angDiff(st.deg, S[n - 1][bi].deg), NB.CAP) + st.e); bk.push(bi);
+      });
+      cost.push(row); back.push(bk);
+    }
+    var last = cost[cost.length - 1], pk = 0;
+    for (var q = 1; q < last.length; q++) if (last[q] < last[pk]) pk = q;
+    var pick = [pk];
+    for (var b = back.length - 1; b >= 0; b--){ pk = back[b][pk]; pick.push(pk); }
+    pick.reverse();
+    seg.forEach(function(k, x){
+      var s = S[x][pick[x]].s, d = lines[k].digits;
+      if (s !== d[0].ch + d[1].ch) setCells(lines[k], [0, 1], s);
+    });
+  }
+  return lines;
 }
 
 function fmtLine(l){
