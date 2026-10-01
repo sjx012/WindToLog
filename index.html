@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WindToLog</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%235080ff'/%3E%3Cpath d='M14 22h26a7 7 0 1 0-7-7M14 32h36a7 7 0 1 1-7 7M14 42h20' fill='none' stroke='%23fff' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --paper:#ffffff; --ink:#373b41; --muted:#7c8189;
+    --accent:#5080ff; --accent-soft:rgba(80,128,255,.14);
+    --line:rgba(55,59,65,.14);
+    --flag:#dc3b3b; --flag-soft:rgba(220,59,59,.12);
+    --mono:"Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--ink); font:400 14.5px/1.65 var(--mono); font-variant-ligatures:none}
+  .wrap{max-width:780px; margin:0 auto; padding-block:34px 44px; padding-left:16px; padding-right:16px}
+  .masthead{margin-bottom:12px}
+  h1{font:700 clamp(21px,4.4vw,30px)/1.2 var(--mono); margin:0 0 6px; letter-spacing:-.02em; text-wrap:balance}
+  .credit{font-size:13.25px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent)}
+  .card{border:1px solid var(--line); border-radius:4px; padding:18px; margin-bottom:16px}
+  .card.off{opacity:.45; pointer-events:none}
+  .step{font-size:13.25px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); font-weight:700; margin:0 0 14px}
+  .hint{font-size:12.5px; color:var(--muted); margin:0 0 12px}
+  .hint b{color:var(--ink)}
+  :focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+  /* 01 paste */
+  .drop{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; text-align:center;
+        min-height:132px; border:1.5px dashed var(--accent); border-radius:4px; background:var(--accent-soft);
+        padding:18px; cursor:pointer; color:var(--ink)}
+  .drop.over{background:rgba(80,128,255,.24)}
+  .drop b{font-size:15px; color:var(--accent)}
+  .drop span{font-size:12px; color:var(--muted)}
+  .drop kbd{font:inherit; border:1px solid var(--line); border-bottom-width:2px; border-radius:3px; padding:0 5px; background:#fff; color:var(--ink)}
+  .status{font-size:12.5px; color:var(--muted); min-height:18px; margin-top:10px}
+  .head1{display:flex; align-items:baseline; justify-content:space-between; gap:12px}
+  .change{font:700 11.5px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--accent);
+          background:#fff; border:1px solid var(--accent); border-radius:3px; padding:7px 10px; cursor:pointer; flex:none}
+  #card1.folded .body1{display:none}
+  #card1.folded .step{margin-bottom:0}
+  #card1.folded .status{margin-top:6px}
+  .status.good{color:var(--accent); font-weight:700}
+  .status.bad{color:#c0392b; font-weight:700}
+
+  /* 02 pick */
+  .pickwrap{position:relative; width:100%; max-width:740px; margin:0 auto}
+  .pickwrap canvas{display:block; width:100%; height:auto; image-rendering:pixelated; border-radius:2px}
+  .route{margin:0 0 12px}
+  .route summary{display:inline-block; cursor:pointer; list-style:none; font:700 12px/1 var(--mono); letter-spacing:.06em;
+                 text-transform:uppercase; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent);
+                 border-radius:3px; padding:9px 12px}
+  .route summary:hover{background:rgba(80,128,255,.24)}
+  .route[open] summary{background:var(--accent); color:#fff}
+  .route summary::-webkit-details-marker{display:none}
+  .route summary::before{content:"+"; display:inline-block; width:1.2em; font-weight:700}
+  .route[open] summary::before{content:"\2212"}
+  .route textarea{display:block; width:100%; margin-top:8px; overflow:hidden; resize:none; font:400 12.5px/1.5 var(--mono); color:var(--ink); border:1px solid var(--line);
+                  border-radius:3px; padding:9px 10px; resize:vertical}
+  .route textarea:focus{border-color:var(--accent); outline:none}
+  .rnote{font-size:12px; color:#c0392b; margin:6px 0 0}
+  #rsvg{position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible}
+  .boxbtn{position:absolute; border:0; padding:0; margin:0; background:transparent; cursor:pointer; border-radius:2px;
+          font:inherit; color:inherit}
+  .boxbtn:hover{background:rgba(80,128,255,.10)}
+  .boxbtn.on{background:rgba(80,128,255,.16); box-shadow:inset 0 0 0 3px var(--accent)}
+  .boxbtn .tag{position:absolute; top:3px; left:3px; min-width:20px; height:20px; padding:0 5px; border-radius:3px;
+               background:var(--accent); color:#fff; font:700 12px/20px var(--mono); text-align:center; display:none}
+  .boxbtn.on .tag{display:block}
+  .mode{display:inline-flex; border:1px solid var(--accent); border-radius:3px; overflow:hidden; margin-top:14px}
+  .mode button{font:700 12px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; border:0; padding:10px 14px;
+               background:#fff; color:var(--accent); cursor:pointer}
+  .mode button[aria-pressed="true"]{background:var(--accent); color:#fff}
+  .picked{font-size:12.5px; color:var(--muted); margin-top:10px; min-height:18px}
+  .split{font-size:12px; color:#8a3a35; background:rgba(220,59,59,.10); border-radius:3px; padding:7px 10px; margin:12px 0 0}
+  td.warnc{color:#c0392b; font-weight:700}
+  .outs > p{flex:1 1 100%; margin:0}
+
+  /* 03 check */
+  .scroll{overflow-x:auto}
+  table{border-collapse:collapse; font-size:13px; width:100%}
+  th,td{text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); white-space:nowrap}
+  th{font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:700}
+  th.box{color:var(--accent)}
+  td.lvl{font-weight:700}
+  td input{width:4.2ch; font:400 13px/1.4 var(--mono); color:var(--ink); border:1px solid transparent; border-radius:3px;
+           padding:3px 4px; background:transparent; text-align:right; font-variant-numeric:tabular-nums}
+  td input:hover{border-color:var(--line)}
+  td input.flag{background:var(--flag-soft); border-color:rgba(220,59,59,.45); color:#8a3a35; font-weight:700}
+  td input.ok{background:transparent}
+  td input:focus{border-color:var(--accent); background:#fff}
+  /* the level being checked: tinted row with a blue frame (drawn on the cells so every browser shows it) */
+  #read tr:focus-within td{background:var(--accent-soft); box-shadow:inset 0 2px 0 var(--accent), inset 0 -2px 0 var(--accent)}
+  #read tr:focus-within td:first-child{box-shadow:inset 2px 0 0 var(--accent), inset 0 2px 0 var(--accent), inset 0 -2px 0 var(--accent)}
+  #read tr:focus-within td:last-child{box-shadow:inset -2px 0 0 var(--accent), inset 0 2px 0 var(--accent), inset 0 -2px 0 var(--accent)}
+  .gap{width:14px; padding:0}
+  .peek{display:none; margin-top:12px; padding:10px; border:1px solid var(--line); border-radius:4px}
+  .peek.show{display:block}
+  .peek p{margin:0 0 8px; font-size:12px; color:var(--muted)}
+  .peek canvas{display:block; width:100%; max-width:540px; height:auto; image-rendering:pixelated}
+  .legend{font-size:12px; color:var(--muted); margin:10px 0 0}
+  .legend i{display:inline-block; width:12px; height:12px; vertical-align:-1px; margin-right:6px; border-radius:2px;
+            background:var(--flag-soft); border:1px solid rgba(220,59,59,.45)}
+
+  .out{margin-top:18px; border-top:1px solid var(--line); padding-top:16px}
+  .outs{display:flex; flex-wrap:wrap; gap:14px}
+  .outbox{flex:1 1 210px; border:1px solid var(--accent); border-radius:4px; overflow:hidden}
+  .outbox h3{margin:0; padding:8px 12px; background:var(--accent-soft); color:var(--accent); font-size:12.5px; letter-spacing:.08em; text-transform:uppercase}
+  .outbox table td, .outbox table th{padding:4px 12px}
+  .outbox .copy{display:block; width:100%; border:0; border-top:1px solid var(--accent); background:var(--accent); color:#fff;
+                font:700 12.5px/1 var(--mono); letter-spacing:.06em; text-transform:uppercase; padding:11px; cursor:pointer}
+  .outbox .copy.done{background:#2e9e5b; border-top-color:#2e9e5b}
+  .where{font-size:12px; color:var(--muted); margin:12px 0 0}
+  .quote{font-size:11.5px; line-height:1.6; color:var(--muted); margin:0; padding-left:.62em; text-indent:-.62em}
+  .quote::before{content:"\201C"; color:var(--accent); font-weight:700; margin-right:1px}
+  .quote::after{content:"\201D"; color:var(--accent); font-weight:700; margin-left:1px}
+  @media (prefers-reduced-motion: no-preference){ button{transition:transform .06s ease} button:active{transform:translateY(1px)} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <h1>GPWT to NavLog</h1>
+    <div class="credit">Built by SJX12</div>
+  </div>
+
+  <div class="card" id="card1">
+    <div class="head1">
+      <p class="step">01 &nbsp;Paste GPWT chart</p>
+      <button type="button" class="change" id="change" hidden>Change chart</button>
+    </div>
+    <div class="body1" id="body1">
+    <p class="hint">On the BoM low-level chart (1000FT to FL140, SA), right-click the image and choose <b>Copy Image</b>, then paste here.</p>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Paste, drop or choose the GPWT chart image">
+      <b>Paste chart here</b>
+      <span><kbd>⌘</kbd> <kbd>V</kbd> &nbsp;or&nbsp; <kbd>Ctrl</kbd> <kbd>V</kbd> &nbsp;·&nbsp; or drop / click to choose a file</span>
+    </div>
+    <input type="file" id="file" accept="image/*" hidden>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+  </div>
+
+  <div class="card off" id="card2">
+    <p class="step">02 &nbsp;Pick boxes</p>
+    <p class="hint">Tap the boxes your route passes through. They are lettered in the order you pick them.</p>
+    <details class="route" id="route">
+      <summary>Show my route on the chart</summary>
+      <textarea id="rcode" rows="3" spellcheck="false" placeholder="Paste the route code from Table A33"></textarea>
+      <p class="rnote" id="rnote" hidden></p>
+    </details>
+    <div class="pickwrap" id="pick"><canvas id="pickc"></canvas><svg id="rsvg" aria-hidden="true"></svg></div>
+    <div class="mode" role="group" aria-label="Output">
+      <button type="button" id="mComb" aria-pressed="true">Combined</button>
+      <button type="button" id="mSep" aria-pressed="false">Separate</button>
+    </div>
+    <div class="picked" id="picked"></div>
+
+  </div>
+
+  <div class="card off" id="card3">
+    <p class="step">03 &nbsp;Check and copy</p>
+    <div class="scroll"><table id="read"></table></div>
+    <p class="legend" id="legend"><i></i>= Unclear. Tap to compare and fix with the chart</p>
+    <div class="peek" id="peek"><p id="peekt"></p><canvas id="peekc"></canvas></div>
+    <div class="out">
+      <div class="outs" id="outs"></div>
+      <p class="where">Paste into <b>Table U4:V9</b></p>
+    </div>
+  </div>
+
+  <footer><p class="quote">Planning aid only. Check every value against the current BoM chart before flight.</p></footer>
+</div>
+
+<script>
+/* ==== GLYPHS-START ==== */
+var GLYPHS = {"groups":{"blk":[["2",[0.17,1.0,1.0,1.0,0.28,1.0,0.43,0.0,0.36,1.0,0.0,0.0,0.0,0.03,1.0,0.0,0.0,0.0,0.78,0.52,0.0,0.0,0.81,0.47,0.0,0.0,0.92,0.41,0.0,0.0,0.72,0.45,0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0]],["9",[0.17,1.0,1.0,0.89,0.0,1.0,0.47,0.0,0.7,0.7,1.0,0.0,0.0,0.08,1.0,1.0,0.45,0.0,0.54,1.0,0.19,1.0,1.0,0.58,1.0,0.0,0.0,0.0,0.17,1.0,0.72,0.26,0.0,0.7,0.58,0.36,1.0,1.0,0.78,0.0]],["0",[0.03,0.96,1.0,0.96,0.01,0.76,0.7,0.0,0.7,0.74,1.0,0.08,0.0,0.08,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.05,0.0,0.1,1.0,0.72,0.52,0.0,0.74,0.7,0.01,0.94,1.0,0.92,0.0]],["4",[0.0,0.0,0.41,1.0,0.0,0.0,0.0,0.87,1.0,0.0,0.0,0.58,0.3,1.0,0.0,0.01,0.86,0.0,1.0,0.0,0.72,0.17,0.0,1.0,0.0,1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0]],["5",[0.99,1.0,1.0,1.0,0.72,1.0,0.05,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.99,1.0,1.0,0.15,0.65,0.21,0.0,0.52,1.0,0.0,0.0,0.0,0.0,1.0,0.96,0.34,0.0,0.52,0.96,0.26,1.0,1.0,0.96,0.1]],["8",[0.3,1.0,1.0,1.0,0.3,1.0,0.28,0.0,0.28,1.0,1.0,0.28,0.0,0.26,1.0,0.15,1.0,1.0,1.0,0.15,0.94,0.45,0.0,0.45,0.96,1.0,0.0,0.0,0.0,1.0,1.0,0.45,0.0,0.43,1.0,0.17,1.0,1.0,1.0,0.17]],["7",[1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,0.32,0.78,0.0,0.0,0.01,1.0,0.0,0.0,0.0,0.74,0.34,0.0,0.0,0.08,0.99,0.0,0.0,0.0,0.61,0.49,0.0,0.0,0.0,1.0,0.13,0.0,0.0,0.0,1.0,0.0,0.0,0.0]],["3",[0.19,1.0,1.0,1.0,0.34,1.0,0.39,0.0,0.28,1.0,0.0,0.0,0.0,0.32,1.0,0.0,0.0,1.0,1.0,0.15,0.0,0.0,0.0,0.47,0.96,0.01,0.0,0.0,0.0,1.0,1.0,0.41,0.0,0.47,1.0,0.21,1.0,1.0,1.0,0.19]],["1",[0.0,0.15,0.87,1.0,0.0,0.0,0.92,0.17,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,1.0]],["1",[0.15,0.87,1.0,0.0,0.0,0.92,0.17,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0]],["6",[0.0,0.78,1.0,1.0,0.34,0.58,0.65,0.0,0.28,0.68,1.0,0.13,0.0,0.0,0.0,1.0,0.58,1.0,1.0,0.21,1.0,0.52,0.0,0.47,1.0,1.0,0.08,0.0,0.0,1.0,0.7,0.54,0.0,0.47,0.99,0.0,0.89,1.0,1.0,0.15]],["0",[0.0,0.03,0.96,1.0,0.96,0.0,0.76,0.7,0.0,0.7,0.0,1.0,0.08,0.0,0.08,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.05,0.0,0.1,0.0,0.72,0.52,0.0,0.74,0.0,0.01,0.94,1.0,0.92]],["5",[0.99,1.0,1.0,1.0,0.72,1.0,0.05,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.99,1.0,1.0,0.15,0.65,0.19,0.0,0.52,1.0,0.0,0.0,0.0,0.0,1.0,0.96,0.34,0.0,0.52,0.96,0.26,1.0,1.0,0.96,0.1]]],"t-5":[["0",[0.17,1.0,1.0,1.0,0.15,1.0,0.97,0.1,0.97,1.0,1.0,0.23,0.0,0.23,1.0,1.0,0.03,0.0,0.03,1.0,1.0,0.03,0.0,0.03,1.0,1.0,0.19,0.0,0.25,1.0,1.0,0.76,0.1,1.0,0.97,0.13,1.0,1.0,1.0,0.13]],["1",[1.0,1.0,0.0,0.0,0.17,0.33,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0,0.13]],["1",[0.31,1.0,1.0,0.0,0.0,1.0,0.33,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0]],["1",[0.0,0.31,1.0,1.0,0.0,0.0,1.0,0.33,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,1.0]],["1",[1.0,1.0,0.0,0.0,1.0,0.33,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,0.97,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0,0.47]],["1",[1.0,1.0,0.0,0.0,0.03,0.33,1.0,0.0,0.0,0.83,0.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,0.97,1.0,1.0,1.0,1.0,0.1]]],"t-6":[["8",[0.49,1.0,1.0,1.0,0.49,1.0,0.47,0.03,0.47,1.0,1.0,0.47,0.03,0.44,1.0,0.31,1.0,1.0,1.0,0.31,1.0,0.68,0.07,0.65,1.0,1.0,0.07,0.0,0.07,1.0,1.0,0.68,0.07,0.65,1.0,0.33,1.0,1.0,1.0,0.33]],["2",[0.33,1.0,1.0,1.0,0.47,1.0,0.63,0.07,0.55,1.0,0.07,0.0,0.0,0.17,1.0,0.0,0.0,0.0,1.0,0.76,0.0,0.07,1.0,0.7,0.0,0.07,1.0,0.63,0.0,0.0,1.0,0.68,0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0]],["6",[0.03,1.0,1.0,1.0,0.55,0.83,0.97,0.13,0.47,0.97,1.0,0.31,0.0,0.0,0.0,1.0,0.83,1.0,1.0,0.38,1.0,0.76,0.07,0.68,1.0,1.0,0.23,0.0,0.07,1.0,0.97,0.76,0.07,0.7,1.0,0.1,1.0,1.0,1.0,0.31]],["1",[0.31,1.0,1.0,0.0,0.0,1.0,0.33,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0]],["5",[1.0,1.0,1.0,1.0,1.0,1.0,0.19,0.0,0.0,0.0,1.0,0.1,0.0,0.0,0.0,1.0,1.0,1.0,1.0,0.31,0.97,0.38,0.07,0.76,1.0,0.0,0.0,0.0,0.07,1.0,1.0,0.55,0.07,0.76,1.0,0.44,1.0,1.0,1.0,0.25]],["0",[0.17,1.0,1.0,1.0,0.15,1.0,0.97,0.1,0.97,1.0,1.0,0.23,0.0,0.23,1.0,1.0,0.03,0.0,0.03,1.0,1.0,0.03,0.0,0.03,1.0,1.0,0.19,0.0,0.25,1.0,1.0,0.76,0.1,1.0,0.97,0.13,1.0,1.0,1.0,0.13]],["7",[1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,0.49,1.0,0.0,0.0,0.15,1.0,0.1,0.0,0.0,1.0,0.55,0.0,0.0,0.23,1.0,0.0,0.0,0.0,0.83,0.76,0.0,0.0,0.0,1.0,0.31,0.0,0.0,0.0,1.0,0.1,0.0,0.0]],["9",[0.33,1.0,1.0,1.0,0.13,1.0,0.68,0.1,0.97,0.97,1.0,0.07,0.0,0.23,1.0,1.0,0.68,0.07,0.76,1.0,0.38,1.0,1.0,0.83,1.0,0.0,0.0,0.0,0.33,1.0,1.0,0.44,0.13,0.97,0.83,0.55,1.0,1.0,1.0,0.03]],["4",[0.0,0.0,0.63,1.0,0.0,0.0,0.07,1.0,1.0,0.0,0.0,0.83,0.49,1.0,0.0,0.15,1.0,0.0,1.0,0.0,1.0,0.33,0.0,1.0,0.0,1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0]],["3",[0.38,1.0,1.0,1.0,0.55,1.0,0.63,0.03,0.47,1.0,0.03,0.0,0.03,0.49,1.0,0.0,0.0,1.0,1.0,0.31,0.0,0.0,0.03,0.7,1.0,0.15,0.0,0.0,0.07,1.0,1.0,0.63,0.07,0.7,1.0,0.38,1.0,1.0,1.0,0.33]]],"t+5":[["0",[0.17,1.0,1.0,1.0,0.15,1.0,0.97,0.1,0.97,1.0,1.0,0.23,0.0,0.23,1.0,1.0,0.03,0.0,0.03,1.0,1.0,0.03,0.0,0.03,1.0,1.0,0.19,0.0,0.25,1.0,1.0,0.76,0.1,1.0,0.97,0.15,1.0,1.0,1.0,0.13]],["1",[0.0,0.31,1.0,1.0,0.0,0.0,1.0,0.33,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,1.0]],["1",[0.31,1.0,1.0,0.0,0.0,1.0,0.33,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0]],["1",[0.0,0.0,0.31,1.0,1.0,0.0,0.0,1.0,0.33,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.46,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0]]],"t+6":[["3",[0.36,1.0,1.0,1.0,0.55,1.0,0.6,0.03,0.49,1.0,0.03,0.0,0.03,0.51,1.0,0.0,0.0,1.0,1.0,0.31,0.0,0.0,0.03,0.7,1.0,0.15,0.0,0.0,0.07,1.0,1.0,0.62,0.07,0.7,1.0,0.38,1.0,1.0,1.0,0.36]],["7",[1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,0.51,1.0,0.0,0.0,0.15,1.0,0.1,0.0,0.0,1.0,0.55,0.0,0.0,0.23,1.0,0.0,0.0,0.0,0.83,0.76,0.0,0.0,0.0,1.0,0.31,0.0,0.0,0.0,1.0,0.1,0.0,0.0]],["1",[0.31,1.0,1.0,0.0,0.0,1.0,0.33,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0]],["2",[0.33,1.0,1.0,1.0,0.46,1.0,0.65,0.07,0.57,1.0,0.07,0.0,0.0,0.17,1.0,0.0,0.0,0.0,1.0,0.76,0.0,0.07,1.0,0.7,0.0,0.07,1.0,0.62,0.0,0.0,1.0,0.68,0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0]],["5",[1.0,1.0,1.0,1.0,1.0,1.0,0.19,0.0,0.0,0.0,1.0,0.1,0.0,0.0,0.0,1.0,1.0,1.0,1.0,0.31,0.92,0.38,0.07,0.76,1.0,0.0,0.0,0.0,0.07,1.0,1.0,0.55,0.07,0.76,1.0,0.45,1.0,1.0,1.0,0.25]],["8",[0.49,1.0,1.0,1.0,0.49,1.0,0.46,0.03,0.46,1.0,1.0,0.49,0.03,0.45,1.0,0.31,1.0,1.0,1.0,0.31,1.0,0.68,0.07,0.65,1.0,1.0,0.07,0.0,0.07,1.0,1.0,0.68,0.07,0.65,1.0,0.33,1.0,1.0,1.0,0.33]],["0",[0.17,1.0,1.0,1.0,0.15,1.0,0.97,0.1,0.97,1.0,1.0,0.23,0.0,0.23,1.0,1.0,0.03,0.0,0.03,1.0,1.0,0.03,0.0,0.03,1.0,1.0,0.19,0.0,0.25,1.0,1.0,0.76,0.1,1.0,0.97,0.15,1.0,1.0,1.0,0.13]],["4",[0.0,0.0,0.62,1.0,0.0,0.0,0.07,1.0,1.0,0.0,0.0,0.83,0.49,1.0,0.0,0.15,1.0,0.0,1.0,0.0,1.0,0.33,0.0,1.0,0.0,1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0]],["9",[0.33,1.0,1.0,1.0,0.13,1.0,0.68,0.1,0.97,0.97,1.0,0.07,0.0,0.23,1.0,1.0,0.68,0.07,0.79,1.0,0.36,1.0,1.0,0.83,1.0,0.0,0.0,0.0,0.33,1.0,1.0,0.45,0.13,0.97,0.83,0.57,1.0,1.0,1.0,0.03]],["6",[0.03,1.0,1.0,1.0,0.55,0.83,0.92,0.13,0.46,0.97,1.0,0.31,0.0,0.0,0.0,1.0,0.83,1.0,1.0,0.38,1.0,0.76,0.07,0.68,1.0,1.0,0.23,0.0,0.07,1.0,0.97,0.79,0.07,0.7,1.0,0.1,1.0,1.0,1.0,0.31]],["1",[0.0,0.31,1.0,1.0,0.0,0.0,1.0,0.33,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,1.0,1.0,1.0,1.0,1.0]],["1",[0.0,0.31,1.0,1.0,0.0,0.0,1.0,0.33,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,1.0]]],"t05":[["0",[0.03,0.96,1.0,0.96,0.01,0.76,0.7,0.0,0.7,0.74,1.0,0.08,0.0,0.08,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.05,0.0,0.1,1.0,0.72,0.52,0.0,0.74,0.7,0.01,0.94,1.0,0.92,0.0]]],"t06":[["0",[0.03,0.96,1.0,0.96,0.01,0.76,0.7,0.0,0.7,0.74,1.0,0.08,0.0,0.08,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.05,0.0,0.1,1.0,0.72,0.52,0.0,0.74,0.7,0.01,0.94,1.0,0.92,0.0]]]},"generic":[["0",[0.0,1.0,1.0,1.0,0.0,1.0,1.0,0.0,1.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,1.0,0.0,1.0,1.0,0.0,1.0,1.0,1.0,0.0]],["0",[0.0,1.0,1.0,1.0,0.0,1.0,1.0,0.0,1.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,1.0,1.0,0.0,1.0,1.0,1.0,0.0]],["1",[0.0,1.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0]],["2",[0.0,1.0,1.0,1.0,0.0,1.0,1.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,1.0,1.0,0.0,0.0,1.0,1.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0]],["2",[0.0,1.0,1.0,1.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0]],["3",[0.0,1.0,1.0,1.0,0.0,1.0,1.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,0.0,1.0,1.0,0.0,1.0,1.0,1.0,0.0]],["3",[0.0,1.0,1.0,1.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,1.0,1.0,1.0,0.0]],["4",[0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0]],["4",[0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,0.0,1.0,0.0,0.0,1.0,0.0,1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0]],["5",[1.0,1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,1.0,0.0,1.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,1.0,1.0,0.0,1.0,1.0,1.0,0.0]],["5",[1.0,1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,1.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,1.0,1.0,1.0,0.0]],["6",[0.0,1.0,1.0,1.0,0.0,1.0,1.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,1.0,0.0,1.0,1.0,0.0,1.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,1.0,0.0,1.0,1.0,0.0,1.0,1.0,1.0,0.0]],["6",[0.0,1.0,1.0,1.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,1.0,1.0,0.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,1.0,1.0,1.0,0.0]],["7",[1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0]],["7",[1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0]],["8",[0.0,1.0,1.0,1.0,0.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,1.0,1.0,1.0,0.0,1.0,1.0,0.0,1.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,1.0,0.0,1.0,1.0,0.0,1.0,1.0,1.0,0.0]],["8",[0.0,1.0,1.0,1.0,0.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,1.0,1.0,1.0,0.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,1.0,1.0,1.0,0.0]],["9",[0.0,1.0,1.0,1.0,0.0,1.0,1.0,0.0,1.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,1.0,0.0,1.0,1.0,0.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,1.0,1.0,0.0,1.0,1.0,1.0,0.0]],["9",[0.0,1.0,1.0,1.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,1.0,0.0,1.0,1.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,1.0,0.0,0.0,1.0,1.0,1.0,0.0]]]};
+/* ==== GLYPHS-END ==== */
+
+/* ==== READER-START ==== */
+var LEVELS = [14000, 10000, 7000, 5000, 2000, 1000];
+var PICK_COLS = [5, 6, 7, 8, 9], PICK_ROWS = [6, 7, 8, 9];  // the block cadets use (count from left / top), col 9 covers Renmark
+var CELL_X = [3, 9, 27, 33, 39, 61, 67];                       // dd, fff, temperature digits, from the box's left line
+var SIG = 0.7, HID_MAX = 0.2, MARGIN_MIN = 0.004, ERR_MAX = 0.03;
+
+function pyRound(x){                       // round half to even, same as the tested reader
+  var f = Math.floor(x), d = x - f;
+  if (d > 0.5) return f + 1;
+  if (d < 0.5) return f;
+  return (f % 2 === 0) ? f : f + 1;
+}
+
+/* pixels -> ink strength 0..1 (coast removed), colour channels, grid lines removed */
+function analyse(img){
+  var W = img.width, H = img.height, p = img.data, n = W * H;
+  var ink = new Float32Array(n), green = new Uint8Array(n), red = new Float32Array(n),
+      blue = new Float32Array(n), dark = new Float32Array(n), lum = new Float32Array(n);
+  for (var i = 0; i < n; i++){
+    var R = p[i*4], G = p[i*4+1], B = p[i*4+2];
+    var L = (R + G + B) / 3;
+    lum[i] = L;
+    green[i] = (G > R + 40 && G > B + 40) ? 1 : 0;
+    var dk = Math.min(1, Math.max(0, (235 - L) / 180));
+    var rd = Math.min(1, Math.max(0, (R - Math.max(G, B)) / 150));
+    var bl = Math.min(1, Math.max(0, (B - Math.max(R, G)) / 150));
+    dark[i] = dk; red[i] = rd; blue[i] = bl;
+    ink[i] = green[i] ? 0 : Math.max(dk, rd, bl);
+  }
+  var x, y, c;
+  var rowFull = [], colFull = [];
+  for (y = 0; y < H; y++){ c = 0; for (x = 0; x < W; x++) if (ink[y*W+x] > 0.45) c++; rowFull.push(c / W > 0.5); }
+  for (x = 0; x < W; x++){ c = 0; for (y = 0; y < H; y++) if (ink[y*W+x] > 0.45) c++; colFull.push(c / H > 0.5); }
+  for (y = 0; y < H; y++) if (rowFull[y]) for (x = 0; x < W; x++) ink[y*W+x] = 0;
+  for (x = 0; x < W; x++) if (colFull[x]) for (y = 0; y < H; y++) ink[y*W+x] = 0;
+  return { W: W, H: H, ink: ink, green: green, red: red, blue: blue, dark: dark, lum: lum };
+}
+
+function median(a){ var s = a.slice().sort(function(p, q){ return p - q; }), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+
+/* box edges from the long dark (non-green) grid lines */
+function findGrid(D){
+  var W = D.W, H = D.H, x, y, c;
+  function dk(i){ return D.lum[i] < 120 && !D.green[i]; }
+  var vx = [], hy = [];
+  for (x = 0; x < W; x++){ c = 0; for (y = 0; y < H; y++) if (dk(y*W+x)) c++; if (c / H > 0.5) vx.push(x); }
+  for (y = 0; y < H; y++){ c = 0; for (x = 0; x < W; x++) if (dk(y*W+x)) c++; if (c / W > 0.5) hy.push(y); }
+  function runs(idx){
+    var out = [];
+    idx.forEach(function(i){
+      var last = out[out.length - 1];
+      if (last && i - last[last.length - 1] <= 3) last.push(i); else out.push([i]);
+    });
+    return out.map(function(r){ return pyRound(r.reduce(function(a, b){ return a + b; }, 0) / r.length); });
+  }
+  function boxes(lines){
+    var gaps = [];
+    for (var i = 1; i < lines.length; i++) if (lines[i] - lines[i-1] > 20) gaps.push(lines[i] - lines[i-1]);
+    if (!gaps.length) return { edges: [], size: 0 };
+    var size = median(gaps);
+    var keep = lines.filter(function(l){
+      return lines.some(function(m){ return m !== l && Math.abs(Math.abs(m - l) - size) <= 3; });
+    });
+    return { edges: keep, size: size };
+  }
+  // looser darkness profile, used only to recover a grid line that resizing has greyed out
+  var colR = [], rowR = [];
+  for (x = 0; x < W; x++){ c = 0; for (y = 0; y < H; y++){ var i = y*W+x; if (D.lum[i] < 170 && !D.green[i]) c++; } colR.push(c / H); }
+  for (y = 0; y < H; y++){ c = 0; for (x = 0; x < W; x++){ var j = y*W+x; if (D.lum[j] < 170 && !D.green[j]) c++; } rowR.push(c / W); }
+  function complete(b, prof, limit){
+    if (!b.edges.length || !b.size) return b;
+    var e = b.edges.slice().sort(function(p, q){ return p - q; }), out = [e[0]], size = b.size;
+    while (true){
+      var want = out[out.length - 1] + size;
+      if (want > limit - 2) break;
+      var hit = e.filter(function(v){ return Math.abs(v - want) <= 3; })[0];
+      if (hit === undefined){
+        var bestP = 0, bestAt = -1;
+        for (var t = Math.round(want) - 3; t <= Math.round(want) + 3; t++){ if (t >= 0 && t < limit && prof[t] > bestP){ bestP = prof[t]; bestAt = t; } }
+        if (bestP < 0.4) break;
+        hit = bestAt;
+      }
+      out.push(hit);
+    }
+    return { edges: out, size: size };
+  }
+  return { x: complete(boxes(runs(vx)), colR, W), y: complete(boxes(runs(hy)), rowR, H) };
+}
+
+function sumInk(D, y0, y1, x0, x1){           // rows y0..y1-1, cols x0..x1-1
+  var s = 0;
+  for (var y = y0; y < y1; y++) for (var x = x0; x < x1; x++) s += D.ink[y*D.W + x];
+  return s;
+}
+
+function lineTop(D, bx, yExp){
+  var best = null;
+  for (var y = yExp - 4; y < yExp + 5; y++){
+    var inside = sumInk(D, y, y + 8, bx + 2, bx + 74);
+    var edge = sumInk(D, y - 1, y, bx + 2, bx + 74) + sumInk(D, y + 8, y + 9, bx + 2, bx + 74);
+    var sc = inside - 2 * edge;
+    if (best === null || sc > best[0]) best = [sc, y];
+  }
+  return best[1];
+}
+
+/* scipy-style gaussian (sigma 0.7, radius 3), rows then columns */
+var KERN = (function(){
+  var k = [], s = 0;
+  for (var i = -3; i <= 3; i++){ var v = Math.exp(-0.5 * (i / SIG) * (i / SIG)); k.push(v); s += v; }
+  return k.map(function(v){ return v / s; });
+})();
+function gauss(a, h, w, mode){               // mode "nearest" clamps, "constant" pads with 0
+  function get(arr, y, x){
+    if (mode === "nearest"){ y = Math.min(h - 1, Math.max(0, y)); x = Math.min(w - 1, Math.max(0, x)); return arr[y*w + x]; }
+    return (y < 0 || y >= h || x < 0 || x >= w) ? 0 : arr[y*w + x];
+  }
+  var t = new Float64Array(h * w), o = new Float64Array(h * w), y, x, k, s;
+  for (y = 0; y < h; y++) for (x = 0; x < w; x++){ s = 0; for (k = -3; k <= 3; k++) s += KERN[k+3] * get(a, y + k, x); t[y*w + x] = s; }
+  for (y = 0; y < h; y++) for (x = 0; x < w; x++){ s = 0; for (k = -3; k <= 3; k++) s += KERN[k+3] * get(t, y, x + k); o[y*w + x] = s; }
+  return o;
+}
+
+/* a 5x8 glyph -> its blurred 10x5 core used for matching */
+function prepGlyph(raw){
+  var pad = new Float64Array(12 * 9);
+  for (var y = 0; y < 8; y++) for (var x = 0; x < 5; x++) pad[(y + 2) * 9 + (x + 2)] = raw[y*5 + x];
+  var b = gauss(pad, 12, 9, "constant"), core = new Float64Array(50);
+  for (y = 0; y < 10; y++) for (x = 0; x < 5; x++) core[y*5 + x] = b[(y + 1) * 9 + (x + 2)];
+  return core;
+}
+var GENERIC = GLYPHS.generic.map(function(g){ return { ch: g[0], core: prepGlyph(g[1]) }; });
+var BANKS = {};
+function bankFor(group){
+  if (BANKS[group]) return BANKS[group];
+  var learned = (GLYPHS.groups[group] || []).map(function(g){ return { ch: g[0], core: prepGlyph(g[1]) }; });
+  var have = {}; learned.forEach(function(g){ have[g.ch] = 1; });
+  if (group === "blk") return (BANKS[group] = learned.concat(GENERIC));     // black digits: learned and generic shapes together
+  return (BANKS[group] = learned.concat(GENERIC.filter(function(g){ return !have[g.ch]; })));
+}
+
+function match(D, x, y, bank){
+  var W = D.W, win = new Float64Array(16 * 13), gm = new Uint8Array(16 * 13), i, j;
+  if (y - 4 < 0 || x - 4 < 0 || y + 12 > D.H || x + 9 > D.W) return { ch: "?", err: 1, margin: 0, hid: 1 };
+  for (i = 0; i < 16; i++) for (j = 0; j < 13; j++){ win[i*13 + j] = D.ink[(y - 4 + i) * W + (x - 4 + j)]; gm[i*13 + j] = D.green[(y - 4 + i) * W + (x - 4 + j)]; }
+  var bw = gauss(win, 16, 13, "nearest");
+  var best = {};
+  for (var dy = 0; dy < 5; dy++){
+    for (var dx = 0; dx < 5; dx++){
+      var n = 0, sub = new Float64Array(50), kn = new Uint8Array(50);
+      for (i = 0; i < 10; i++) for (j = 0; j < 5; j++){
+        var k = (dy + 1 + i) * 13 + (dx + 2 + j);
+        sub[i*5 + j] = bw[k]; kn[i*5 + j] = gm[k] ? 0 : 1; n += kn[i*5 + j];
+      }
+      if (n < 20) continue;
+      var hc = 0;
+      for (i = 0; i < 8; i++) for (j = 0; j < 5; j++) hc += gm[(dy + 2 + i) * 13 + (dx + 2 + j)];
+      var hid = hc / 40;
+      for (var b = 0; b < bank.length; b++){
+        var e = 0, core = bank[b].core;
+        for (var q = 0; q < 50; q++) if (kn[q]){ var d = core[q] - sub[q]; e += d * d; }
+        e /= n;
+        var ch = bank[b].ch;
+        if (!(ch in best) || e < best[ch].e) best[ch] = { e: e, hid: hid };
+      }
+    }
+  }
+  var ranked = Object.keys(best).map(function(ch){ return { ch: ch, e: best[ch].e, hid: best[ch].hid }; })
+    .sort(function(p, q){ return p.e - q.e || (p.ch < q.ch ? -1 : 1); });
+  if (!ranked.length) return { ch: "?", err: 1, margin: 0, hid: 1 };
+  var top = ranked[0];
+  return { ch: top.ch, err: top.e, margin: ranked.length > 1 ? ranked[1].e - top.e : 1, hid: top.hid };
+}
+
+function signOf(D, bx, y){
+  var r = 0, b = 0, k = 0;
+  for (var yy = y; yy < y + 8; yy++) for (var xx = bx + 52; xx < bx + 74; xx++){
+    var i = yy * D.W + xx; r += D.red[i]; b += D.blue[i]; if (!D.green[i]) k += D.dark[i];
+  }
+  if (r > Math.max(b, 1.5) && r > 0.3 * k) return "+";
+  if (b > Math.max(r, 1.5) && b > 0.3 * k) return "-";
+  return "";
+}
+
+function readBox(D, bx, by, bh){
+  var out = [];
+  for (var i = 0; i < 6; i++){
+    var y = lineTop(D, bx, by + 2 + pyRound((bh - 3) / 6 * i));
+    var cnt = 0, rows = 0;
+    for (var yy = y - 1; yy < y + 9; yy++){
+      var rc = 0;
+      for (var xx = bx + 2; xx < bx + 74; xx++) if (D.ink[yy * D.W + xx] > 0.45) rc++;
+      cnt += rc; if (rc > 0) rows++;
+    }
+    if (cnt < 40 && rows <= 3){ out.push({ missing: true }); continue; }
+    var sign = signOf(D, bx, y), digits = [];
+    for (var j = 0; j < CELL_X.length; j++){
+      var group = j < 5 ? "blk" : ("t" + (sign || "0") + j);
+      var m = match(D, bx + CELL_X[j], y, bankFor(group));
+      m.flag = m.hid > HID_MAX || m.margin < MARGIN_MIN || m.err > ERR_MAX;
+      digits.push(m);
+    }
+    out.push({ missing: false, sign: sign, digits: digits, y: y });
+  }
+  return out;
+}
+
+function fmtLine(l){
+  if (l.missing) return "-- --- ---";
+  var d = l.digits.map(function(m){ return m.ch; });
+  return d[0] + d[1] + " " + d[2] + d[3] + d[4] + " " + l.sign + d[5] + d[6];
+}
+/* ==== READER-END ==== */
+
+var $ = function(id){ return document.getElementById(id); };
+var state = { D: null, grid: null, src: null, boxes: {}, picked: [], combined: true, weight: {} };
+
+function show(msg, kind){ var s = $("status"); s.textContent = msg; s.className = "status" + (kind ? " " + kind : ""); }
+
+/* ---------- loading the image ---------- */
+function loadBlob(blob){
+  if (!blob || !/^image\//.test(blob.type)){ show("That isn't an image. Copy the chart image itself.", "bad"); return; }
+  var url = URL.createObjectURL(blob), im = new Image();
+  im.onload = function(){ URL.revokeObjectURL(url); start(im); };
+  im.onerror = function(){ show("Couldn't open that image.", "bad"); };
+  im.src = url;
+}
+
+function toCanvas(im, w, h){
+  var c = document.createElement("canvas"); c.width = w; c.height = h;
+  var x = c.getContext("2d"); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = "high";
+  x.drawImage(im, 0, 0, w, h); return c;
+}
+
+function shrinkBlocks(src, k){
+  var w = Math.floor(src.width / k), h = Math.floor(src.height / k);
+  var a = src.getContext("2d").getImageData(0, 0, src.width, src.height).data;
+  var out = document.createElement("canvas"); out.width = w; out.height = h;
+  var octx = out.getContext("2d"), o = octx.createImageData(w, h);
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) for (var ch = 0; ch < 4; ch++){
+    var s = 0;
+    for (var dy = 0; dy < k; dy++) for (var dx = 0; dx < k; dx++) s += a[((y * k + dy) * src.width + (x * k + dx)) * 4 + ch];
+    o.data[(y * w + x) * 4 + ch] = Math.round(s / (k * k));
+  }
+  octx.putImageData(o, 0, 0); return out;
+}
+
+function start(im){
+  var c = toCanvas(im, im.naturalWidth, im.naturalHeight);
+  var D = analyse(c.getContext("2d").getImageData(0, 0, c.width, c.height));
+  var g = findGrid(D), note = "";
+  var size = (g.x.size + g.y.size) / 2;
+  if (size && Math.abs(size - 77.5) > 4){                      // a screenshot at another zoom: bring it back to chart scale
+    var f = size / 77.5, whole = Math.round(f);
+    if (whole >= 2 && Math.abs(f - whole) < 0.06) c = shrinkBlocks(c, whole);   // Retina 2x / 3x: average pixel blocks
+    else {                                                     // odd zoom: digits too blurred to trust
+      show("This screenshot was taken at a zoom the reader can't trust. On the BoM page, right-click the chart and choose Copy Image, then paste here.", "bad");
+      state.D = null; state.boxes = {}; state.picked = [];
+      $("card2").classList.add("off"); $("card3").classList.add("off");
+      return;
+    }
+    D = analyse(c.getContext("2d").getImageData(0, 0, c.width, c.height));
+    g = findGrid(D);
+    note = " This was a screenshot, so more values may be flagged. Copy Image on the BoM page gives the cleanest read.";
+  }
+  var nx = g.x.edges.length - 1, ny = g.y.edges.length - 1;
+  if (nx < 8 || ny < 9 || Math.abs(g.x.size - 77.5) > 4){
+    show("This doesn't look like the BoM low-level GPWT chart (1000FT to FL140, SA). Copy the chart image itself, not a cropped screenshot.", "bad");
+    state.D = null; state.boxes = {}; state.picked = [];
+    $("card2").classList.add("off"); $("card3").classList.add("off"); fold(false);
+    return;
+  }
+  state.D = D; state.grid = g; state.src = c; state.boxes = {};
+  PICK_ROWS.forEach(function(r){ PICK_COLS.forEach(function(cc){
+    var bx = g.x.edges[cc - 1], by = g.y.edges[r - 1], bh = g.y.edges[r] - by;
+    var b = { c: cc, r: r, bx: bx, by: by, bw: g.x.edges[cc] - bx, bh: bh, lines: readBox(D, bx, by, bh) };
+    b.vals = valuesOf(b); b.vals.forEach(function(v){ v.checked = {}; });
+    state.boxes[cc + "," + r] = b;
+  }); });
+  show("* Chart read. " + Object.keys(state.boxes).length + " boxes ready." + note, "");
+  drawPicker();
+  drawRoute();
+  fold(true);
+  $("card2").classList.remove("off");
+  state.picked = state.picked.filter(function(k){ return state.boxes[k]; });
+  refresh();
+}
+
+function fold(on){                          // the paste card shrinks to one line once a chart is in
+  $("card1").classList.toggle("folded", on);
+  $("change").hidden = !on;
+}
+
+/* ---------- 02 picker ---------- */
+function drawPicker(){
+  var g = state.grid, x0 = g.x.edges[PICK_COLS[0] - 1], x1 = g.x.edges[PICK_COLS[PICK_COLS.length - 1]],
+      y0 = g.y.edges[PICK_ROWS[0] - 1], y1 = g.y.edges[PICK_ROWS[PICK_ROWS.length - 1]];
+  var cv = $("pickc"); cv.width = (x1 - x0) * 2; cv.height = (y1 - y0) * 2;
+  var ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(state.src, x0, y0, x1 - x0, y1 - y0, 0, 0, cv.width, cv.height);
+  var wrap = $("pick"); wrap.querySelectorAll(".boxbtn").forEach(function(b){ b.remove(); });
+  Object.keys(state.boxes).forEach(function(k){
+    var b = state.boxes[k], btn = document.createElement("button");
+    btn.type = "button"; btn.className = "boxbtn"; btn.dataset.key = k;
+    btn.style.left = ((b.bx - x0) / (x1 - x0) * 100) + "%"; btn.style.top = ((b.by - y0) / (y1 - y0) * 100) + "%";
+    btn.style.width = (b.bw / (x1 - x0) * 100) + "%"; btn.style.height = (b.bh / (y1 - y0) * 100) + "%";
+    var lat = 25.5 + 1.5 * (b.r - 1), lon = 129 + 1.5 * (b.c - 1);
+    btn.title = "Column " + b.c + ", row " + b.r + " (centre " + lat.toFixed(1) + "S " + lon.toFixed(1) + "E)";
+    btn.setAttribute("aria-label", btn.title);
+    btn.innerHTML = '<span class="tag"></span>';
+    btn.addEventListener("click", function(){ toggle(k); });
+    wrap.appendChild(btn);
+  });
+}
+
+/* ---------- route over the chart ----------
+   Box (col c, row r) covers lon 128.25+1.5(c-1) .. +1.5 E and lat 24.75+1.5(r-1) .. +1.5 S
+   (the chart labels 129E and 27S sit on the centres of column 1 and row 2). */
+function geoToChart(lat, lon){
+  var g = state.grid, xe = g.x.edges, ye = g.y.edges;
+  var c = (lon - 128.25) / 1.5, r = (-lat - 24.75) / 1.5;
+  function along(edges, f){
+    var i = Math.max(0, Math.min(edges.length - 2, Math.floor(f)));
+    return edges[i] + (f - i) * (edges[i + 1] - edges[i]);
+  }
+  return { x: along(xe, c), y: along(ye, r) };
+}
+function boxOf(lat, lon){ return (Math.floor((lon - 128.25) / 1.5) + 1) + "," + (Math.floor((-lat - 24.75) / 1.5) + 1); }
+
+function parseRoute(text){
+  var t = String(text).trim(), body = t;
+  if (/^NAV\d+\|/i.test(t)){
+    var parts = t.split("|"), at = /^\d{4}$/.test((parts[2] || "").trim()) ? 3 : 2;
+    body = parts.slice(at).join("|");
+  }
+  var pts = [];
+  body.split(/[;\n]+/).forEach(function(seg){
+    var f = seg.split(",").map(function(x){ return x.trim(); });
+    if (f.length < 3) return;
+    var lat = Number(f[1]), lon = Number(f[2]);
+    if (!isFinite(lat) || !isFinite(lon)) return;
+    if (Math.abs(lat) > 90 && Math.abs(lon) <= 90){ var sw = lat; lat = lon; lon = sw; }
+    if (lat > 0) lat = -lat;                                   // Australia: south
+    pts.push({ name: f[0].replace(/\*$/, ""), lat: lat, lon: lon });
+  });
+  return pts;
+}
+
+var R_NM = 3440.065;
+function rad(d){ return d * Math.PI / 180; }
+function gcDist(a, b){
+  var p1 = rad(a.lat), p2 = rad(b.lat), dp = rad(b.lat - a.lat), dl = rad(b.lon - a.lon);
+  var h = Math.sin(dp/2) * Math.sin(dp/2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl/2) * Math.sin(dl/2);
+  return 2 * R_NM * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function gcPoint(a, b, f){                     // point a fraction f along the great circle a->b
+  var p1 = rad(a.lat), l1 = rad(a.lon), p2 = rad(b.lat), l2 = rad(b.lon);
+  var d = gcDist(a, b) / R_NM;
+  if (d < 1e-9) return { lat: a.lat, lon: a.lon };
+  var A = Math.sin((1 - f) * d) / Math.sin(d), B = Math.sin(f * d) / Math.sin(d);
+  var x = A * Math.cos(p1) * Math.cos(l1) + B * Math.cos(p2) * Math.cos(l2);
+  var y = A * Math.cos(p1) * Math.sin(l1) + B * Math.cos(p2) * Math.sin(l2);
+  var z = A * Math.sin(p1) + B * Math.sin(p2);
+  return { lat: Math.atan2(z, Math.sqrt(x*x + y*y)) * 180 / Math.PI, lon: Math.atan2(y, x) * 180 / Math.PI };
+}
+
+/* NM of the route inside each box, in the order the route first enters them */
+function routeShares(pts){
+  var nm = {}, order = [], outside = 0, total = 0, STEP = 0.25;
+  for (var i = 0; i + 1 < pts.length; i++){
+    var a = pts[i], b = pts[i + 1], L = gcDist(a, b), n = Math.max(1, Math.ceil(L / STEP));
+    for (var k = 0; k < n; k++){
+      var m = gcPoint(a, b, (k + 0.5) / n), key = boxOf(m.lat, m.lon), d = L / n;
+      total += d;
+      if (!state.boxes[key]){ outside += d; continue; }
+      if (!(key in nm)){ nm[key] = 0; order.push(key); }
+      nm[key] += d;
+    }
+  }
+  return { nm: nm, order: order, outside: outside, total: total };
+}
+
+function drawRoute(){
+  var svg = $("rsvg"), cv = $("pickc");
+  svg.innerHTML = "";
+  if (!state.D || !state.route || state.route.length < 2) return;
+  var g = state.grid, x0 = g.x.edges[PICK_COLS[0] - 1], y0 = g.y.edges[PICK_ROWS[0] - 1];
+  svg.setAttribute("viewBox", "0 0 " + cv.width + " " + cv.height);
+  function P(p){ var c = geoToChart(p.lat, p.lon); return [(c.x - x0) * 2, (c.y - y0) * 2]; }
+  var sh = routeShares(state.route), NS = "http://www.w3.org/2000/svg", html = "";
+  sh.order.forEach(function(k){                                    // dashed frame on every box the route crosses
+    var b = state.boxes[k];
+    html += '<rect x="' + ((b.bx - x0) * 2 + 3) + '" y="' + ((b.by - y0) * 2 + 3) + '" width="' + (b.bw * 2 - 6) + '" height="' + (b.bh * 2 - 6) +
+            '" fill="none" stroke="#d000c8" stroke-width="3" stroke-dasharray="10 7"/>';
+  });
+  var line = [];
+  for (var i = 0; i + 1 < state.route.length; i++){
+    var a = state.route[i], b = state.route[i + 1], n = Math.max(1, Math.ceil(gcDist(a, b) / 2));
+    for (var k = 0; k <= n; k++){ if (i > 0 && k === 0) continue; line.push(P(gcPoint(a, b, k / n)).join(",")); }
+  }
+  html += '<polyline points="' + line.join(" ") + '" fill="none" stroke="#fff" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>';
+  html += '<polyline points="' + line.join(" ") + '" fill="none" stroke="#d000c8" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/>';
+  state.route.forEach(function(p){
+    var q = P(p);
+    html += '<circle cx="' + q[0] + '" cy="' + q[1] + '" r="6" fill="#fff" stroke="#d000c8" stroke-width="3"/>';
+    html += '<text x="' + (q[0] + 9) + '" y="' + (q[1] - 8) + '" font-family="Fira Code, monospace" font-size="17" font-weight="700" fill="#d000c8" stroke="#fff" stroke-width="4" paint-order="stroke">' +
+            p.name.replace(/[<&>]/g, "") + "</text>";
+  });
+  svg.innerHTML = html;
+}
+
+function toggle(k){
+  var i = state.picked.indexOf(k);
+  if (i >= 0) state.picked.splice(i, 1); else state.picked.push(k);
+  refresh();
+}
+
+function letter(i){ return String.fromCharCode(65 + i); }
+
+/* ---------- values ---------- */
+function valuesOf(b){
+  return b.lines.map(function(l){
+    if (l.missing) return { missing: true };
+    var d = l.digits;
+    var dir = parseInt(d[0].ch + d[1].ch, 10) * 10, spd = parseInt(d[2].ch + d[3].ch + d[4].ch, 10),
+        t = parseInt(d[5].ch + d[6].ch, 10);
+    return { missing: false, dir: dir, spd: spd, temp: l.sign === "-" ? -t : t,
+             fDir: d[0].flag || d[1].flag, fSpd: d[2].flag || d[3].flag || d[4].flag, fTemp: d[5].flag || d[6].flag };
+  });
+}
+
+/* Combining boxes: vector (component) average, weighted by how much of the route each box covers.
+   Each wind is split into north and east parts, the parts are averaged, and the average is turned back
+   into direction and speed. Averaging directions as plain numbers fails across north (350 and 010 give 180). */
+function vecMean(list){                      // list of {dir, spd, w}
+  var u = 0, v = 0, wsum = 0, scalar = 0;
+  list.forEach(function(x){
+    if (!x || !isFinite(x.dir) || !isFinite(x.spd)) return;
+    var w = isFinite(x.w) && x.w > 0 ? x.w : (x.w === 0 ? 0 : 1);
+    if (!w) return;
+    var a = x.dir * Math.PI / 180;
+    u += w * x.spd * Math.sin(a); v += w * x.spd * Math.cos(a); wsum += w; scalar += w * x.spd;
+  });
+  if (!wsum) return null;
+  u /= wsum; v /= wsum; scalar /= wsum;
+  var exact = Math.sqrt(u * u + v * v);
+  var spd = Math.round(exact);
+  var dir = Math.round((Math.atan2(u, v) * 180 / Math.PI + 360) % 360);
+  if (spd === 0) dir = 0; else if (dir === 0) dir = 360;
+  // steadiness: 1 when all boxes agree, lower as their directions spread and partly cancel
+  return { dir: dir, spd: spd, steady: scalar > 0 ? exact / scalar : 1, mean: scalar };
+}
+
+/* ---------- 03 table, outputs ---------- */
+function refresh(){
+  document.querySelectorAll(".boxbtn").forEach(function(btn){
+    var i = state.picked.indexOf(btn.dataset.key);
+    btn.classList.toggle("on", i >= 0); btn.setAttribute("aria-pressed", i >= 0);
+    btn.querySelector(".tag").textContent = i >= 0 ? letter(i) : "";
+  });
+  $("mComb").setAttribute("aria-pressed", state.combined); $("mSep").setAttribute("aria-pressed", !state.combined);
+  var n = state.picked.length;
+  $("picked").textContent = n ? n + " box" + (n > 1 ? "es" : "") + " picked: " +
+    state.picked.map(function(k, i){ var b = state.boxes[k]; return letter(i) + " (col " + b.c + ", row " + b.r + ")"; }).join("  ") : "No boxes picked yet.";
+  $("card3").classList.toggle("off", !n);
+  buildTable(); buildOutputs();
+}
+
+function buildTable(){
+  var t = $("read"); t.innerHTML = "";
+  if (!state.picked.length) return;
+  var head = "<tr><th>Level ft</th>";
+  state.picked.forEach(function(k, i){ head += '<th class="gap"></th><th class="box" colspan="3">' + letter(i) + "</th>"; });
+  head += "</tr><tr><th></th>";
+  state.picked.forEach(function(){ head += '<th class="gap"></th><th>°T</th><th>kt</th><th>°C</th>'; });
+  t.insertAdjacentHTML("beforeend", head + "</tr>");
+  LEVELS.forEach(function(lv, li){
+    var tr = document.createElement("tr");
+    tr.innerHTML = '<td class="lvl">' + lv + "</td>";
+    state.picked.forEach(function(k, bi){
+      var b = state.boxes[k], v = b.vals[li];
+      tr.insertAdjacentHTML("beforeend", '<td class="gap"></td>');
+      [["dir", "fDir", 3], ["spd", "fSpd", 3], ["temp", null, 3]].forEach(function(f){   // temperature shown, never flagged
+        var td = document.createElement("td"), inp = document.createElement("input");
+        inp.inputMode = "numeric"; inp.autocomplete = "off"; inp.maxLength = 4;
+        inp.setAttribute("aria-label", "Box " + letter(bi) + " " + lv + " ft " + f[0]);
+        if (v.missing){ inp.value = "-"; inp.disabled = true; }
+        else {
+          inp.value = f[0] === "dir" ? String(v.dir).padStart(3, "0") : (f[0] === "temp" ? (v.temp > 0 ? "+" : "") + v.temp : String(v.spd).padStart(3, "0"));
+          if (v[f[1]] && !v.checked[f[0]]) inp.className = "flag";
+        }
+        inp.addEventListener("focus", function(){ peek(k, li, bi); });
+        inp.addEventListener("input", function(){
+          var x = parseInt(inp.value.replace(/[^0-9+-]/g, ""), 10);
+          var okRange = isFinite(x) && x >= RANGE[f[0]][0] && x <= RANGE[f[0]][1];
+          v.checked[f[0]] = true;
+          if (okRange){ v[f[0]] = x; inp.className = "ok"; v.bad = v.bad || {}; v.bad[f[0]] = false; }
+          else { inp.className = "flag"; v.bad = v.bad || {}; v.bad[f[0]] = true; }
+          buildOutputs();
+        });
+        inp.addEventListener("blur", function(){ if (v[f[1]] && !(v.bad && v.bad[f[0]])){ v.checked[f[0]] = true; inp.className = "ok"; } });
+        td.appendChild(inp); tr.appendChild(td);
+      });
+    });
+    t.appendChild(tr);
+  });
+  var any = state.picked.some(function(k){ return state.boxes[k].vals.some(function(v){ return !v.missing && (v.fDir || v.fSpd); }); });
+  $("legend").style.display = any ? "" : "none";
+}
+
+/* zoomed chart line for the value being checked */
+function peek(k, li, bi){
+  var b = state.boxes[k], l = b.lines[li], cv = $("peekc"), sc = 7;
+  var y = l.missing ? b.by + 2 + pyRound((b.bh - 3) / 6 * li) : l.y;
+  cv.width = (b.bw) * sc; cv.height = 12 * sc;
+  var ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(state.src, b.bx, y - 2, b.bw, 12, 0, 0, cv.width, cv.height);
+  $("peekt").textContent = "Chart, box " + letter(bi) + " at " + LEVELS[li] + " ft";
+  $("peek").classList.add("show");
+}
+
+var RANGE = { dir: [0, 360], spd: [0, 250], temp: [-60, 50] };   // anything outside is a typo
+
+function tsv(rows){ return rows.map(function(r){ return r ? r.dir + "\t" + r.spd : "\t"; }).join("\n"); }
+
+function buildOutputs(){
+  var wrap = $("outs"); wrap.innerHTML = "";
+  if (!state.picked.length) return;
+  var sets = [];
+  if (state.combined){
+    sets.push({ title: state.picked.length > 1 ? "Combined " + state.picked.map(function(k, i){ return letter(i); }).join(" + ") : "Box A",
+      rows: LEVELS.map(function(lv, li){
+        return vecMean(state.picked.map(function(k){
+          var v = state.boxes[k].vals[li];
+          if (v.missing) return null;
+          return { dir: v.dir, spd: v.spd, w: state.weight[k] !== undefined ? state.weight[k] : 1 };
+        }));
+      }), combined: state.picked.length > 1 });
+  } else {
+    state.picked.forEach(function(k, i){
+      sets.push({ title: "Box " + letter(i), rows: state.boxes[k].vals.map(function(v){ return v.missing ? null : vecMean([v]); }) });
+    });
+  }
+  sets.forEach(function(s){
+    var box = document.createElement("div"); box.className = "outbox";
+    var html = "<h3>" + s.title + "</h3><table><tr><th>Level ft</th><th>°T</th><th>kt</th></tr>";
+    var split = [];
+    s.rows.forEach(function(r, li){
+      var warn = s.combined && r && r.mean >= 5 && r.steady < 0.85;
+      if (warn) split.push(LEVELS[li]);
+      html += "<tr><td>" + LEVELS[li] + "</td><td" + (warn ? ' class="warnc"' : "") + ">" + (r ? String(r.dir).padStart(3, "0") : "-") +
+              "</td><td" + (warn ? ' class="warnc"' : "") + ">" + (r ? r.spd : "-") + (warn ? " ⚠" : "") + "</td></tr>";
+    });
+    box.innerHTML = html + "</table>";
+    if (split.length) s.split = split;
+    var btn = document.createElement("button"); btn.type = "button"; btn.className = "copy"; btn.textContent = "Copy for NavLog";
+    btn.addEventListener("click", function(){
+      var bad = state.picked.some(function(k){ return state.boxes[k].vals.some(function(v){ return v.bad && (v.bad.dir || v.bad.spd || v.bad.temp); }); });
+      if (bad){ btn.textContent = "Fix the red value first"; setTimeout(function(){ btn.textContent = "Copy for NavLog"; }, 2200); return; }
+      copyText(tsv(s.rows), btn);
+    });
+    box.appendChild(btn); wrap.appendChild(box);
+    if (s.split){
+      var p = document.createElement("p"); p.className = "split";
+      p.textContent = "⚠ At " + s.split.join(", ") + " ft the boxes disagree on direction, so their winds partly cancel and the combined speed comes out low. " +
+        "It is still the right average for the whole route, but for each leg use Separate and that leg's own box.";
+      wrap.appendChild(p);
+    }
+  });
+}
+
+function unchecked(){
+  var n = 0;
+  state.picked.forEach(function(k){ state.boxes[k].vals.forEach(function(v){
+    if (v.missing) return;
+    if (v.fDir && !v.checked.dir) n++; if (v.fSpd && !v.checked.spd) n++;
+  }); });
+  return n;
+}
+
+function copyText(text, btn){
+  function done(){
+    var n = unchecked();
+    btn.textContent = n ? "Copied · " + n + " unchecked" : "Copied";
+    btn.classList.add("done");
+    setTimeout(function(){ btn.textContent = "Copy for NavLog"; btn.classList.remove("done"); }, 2200);
+  }
+  if (navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(done, fallback);
+  } else fallback();
+  function fallback(){
+    var ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); done(); } catch (e){ btn.textContent = "Copy failed"; }
+    ta.remove();
+  }
+}
+
+/* ---------- events ---------- */
+document.addEventListener("paste", function(e){
+  var items = (e.clipboardData || {}).items || [];
+  var tg = e.target && e.target.tagName;
+  if (tg === "TEXTAREA" || tg === "INPUT"){                 // typing in a box: only take over if it really is an image
+    for (var j = 0; j < items.length; j++) if (items[j].type.indexOf("image/") === 0){ e.preventDefault(); loadBlob(items[j].getAsFile()); }
+    return;
+  }
+  for (var i = 0; i < items.length; i++){
+    if (items[i].type.indexOf("image/") === 0){ e.preventDefault(); loadBlob(items[i].getAsFile()); return; }
+  }
+  show("No image on the clipboard. On the BoM page, right-click the chart and choose Copy Image.", "bad");
+});
+var drop = $("drop");
+drop.addEventListener("click", function(){ $("file").click(); });
+drop.addEventListener("keydown", function(e){ if (e.key === "Enter" || e.key === " "){ e.preventDefault(); $("file").click(); } });
+$("file").addEventListener("change", function(){ if (this.files[0]) loadBlob(this.files[0]); this.value = ""; });
+["dragenter", "dragover"].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add("over"); }); });
+["dragleave", "drop"].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove("over"); }); });
+drop.addEventListener("drop", function(e){ var f = e.dataTransfer.files[0]; if (f) loadBlob(f); });
+$("rcode").addEventListener("input", function(){            // draws as soon as a route is pasted
+  var box = $("rcode"), raw = box.value, clean = raw.replace(/^\s+|\s+$/g, "");
+  if (clean !== raw) box.value = clean;                       // the sheet pads the cell with spaces
+  box.style.height = "auto"; box.style.height = (box.scrollHeight + 2) + "px";   // grow to show the whole code
+  setTimeout(function(){ box.scrollTop = 0; }, 0);
+  var txt = clean;
+  state.route = parseRoute(txt);
+  var ok = state.route.length >= 2;
+  $("rnote").hidden = ok || !txt; $("rnote").textContent = "No waypoints found. Paste the route code from Table A33.";
+  if (ok) drawRoute(); else $("rsvg").innerHTML = "";
+});
+$("change").addEventListener("click", function(){ fold(false); $("drop").focus(); });
+$("mComb").addEventListener("click", function(){ state.combined = true; refresh(); });
+$("mSep").addEventListener("click", function(){ state.combined = false; refresh(); });
+</script>
+</body>
+</html>
