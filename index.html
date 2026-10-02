@@ -212,9 +212,15 @@ function analyse(img){
     ink[i] = green[i] ? 0 : Math.max(dk, rd, bl);
   }
   var x, y, c;
-  var rowFull = [], colFull = [];
-  for (y = 0; y < H; y++){ c = 0; for (x = 0; x < W; x++) if (ink[y*W+x] > 0.45) c++; rowFull.push(c / W > 0.5); }
-  for (x = 0; x < W; x++){ c = 0; for (y = 0; y < H; y++) if (ink[y*W+x] > 0.45) c++; colFull.push(c / H > 0.5); }
+  var rowFull = [], colFull = [], RUN_MIN = 40;
+  // a grid line is mostly dark AND one long unbroken run; a column of stacked "1"s is dark too, but only in 8 px pieces
+  var run, best;
+  for (y = 0; y < H; y++){ c = 0; run = 0; best = 0;
+    for (x = 0; x < W; x++){ if (ink[y*W+x] > 0.45){ c++; run++; if (run > best) best = run; } else run = 0; }
+    rowFull.push(c / W > 0.5 && best >= RUN_MIN); }
+  for (x = 0; x < W; x++){ c = 0; run = 0; best = 0;
+    for (y = 0; y < H; y++){ if (ink[y*W+x] > 0.45){ c++; run++; if (run > best) best = run; } else run = 0; }
+    colFull.push(c / H > 0.5 && best >= RUN_MIN); }
   for (y = 0; y < H; y++) if (rowFull[y]) for (x = 0; x < W; x++) ink[y*W+x] = 0;
   for (x = 0; x < W; x++) if (colFull[x]) for (y = 0; y < H; y++) ink[y*W+x] = 0;
   return { W: W, H: H, ink: ink, green: green, red: red, blue: blue, dark: dark, lum: lum };
