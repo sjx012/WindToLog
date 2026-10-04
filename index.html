@@ -94,7 +94,7 @@
   td input{width:4.2ch; font:400 13px/1.4 var(--mono); color:var(--ink); border:1px solid transparent; border-radius:3px;
            padding:3px 4px; background:transparent; text-align:right; font-variant-numeric:tabular-nums}
   td input:hover{border-color:var(--line)}
-  td input.flag{background:var(--flag-soft); border-color:rgba(220,59,59,.45); color:#8a3a35; font-weight:700}
+  td input.flag{background-color:transparent; border-color:transparent; background-image:repeating-linear-gradient(90deg, rgba(220,59,59,.65) 0 4px, transparent 4px 7px); background-size:100% 2px; background-repeat:no-repeat; background-position:0 calc(100% - 4px); color:var(--ink)}
   td input.ok{background:transparent}
   td input:focus{border-color:var(--accent); background:#fff}
   /* the level being checked: tinted row with a blue frame (drawn on the cells so every browser shows it) */
@@ -135,7 +135,9 @@
   /* read-only view: values look like plain text until editing is switched on */
   #read.view td input{cursor:default; border-color:transparent; background:transparent}
   #read.view td input:hover{border-color:transparent}
-  #read.view td input.flag{cursor:pointer; background:var(--flag-soft); border-color:rgba(220,59,59,.45)}
+  #read.view td input.flag{cursor:pointer; background-color:transparent; border-color:transparent; background-image:repeating-linear-gradient(90deg, rgba(220,59,59,.65) 0 4px, transparent 4px 7px); background-size:100% 2px; background-repeat:no-repeat; background-position:0 calc(100% - 4px)}
+  td input.flag:hover, #read.view td input.flag:hover{background-color:var(--flag-soft)}
+  td input.flag:focus{border-color:var(--accent); background:#fff}
   .chips{display:flex; flex-wrap:wrap; gap:6px; margin:-4px 0 12px}
   .chip{font-size:12px; border:1px solid var(--line); border-radius:3px; padding:2px 8px; color:var(--muted)}
   .chip b{color:var(--accent); margin-right:2px}
@@ -156,8 +158,8 @@
   .bx{position:relative; flex:0 0 auto}
   .bx b{position:absolute; left:0; right:0; top:-17px; font-size:11px; letter-spacing:.12em; color:var(--accent); text-align:center}
   .bx canvas{border:1px solid var(--line); border-radius:3px; display:block}
-  .legend i{display:inline-block; width:12px; height:12px; vertical-align:-1px; margin-right:6px; border-radius:2px;
-            background:var(--flag-soft); border:1px solid rgba(220,59,59,.45)}
+  .legend i{display:inline-block; width:16px; height:0; vertical-align:3px; margin-right:6px;
+            border-bottom:2px dashed rgba(220,59,59,.65)}
 
   .out{margin-top:18px; border-top:1px solid var(--line); padding-top:16px}
   .outs{display:flex; flex-wrap:wrap; gap:14px}
