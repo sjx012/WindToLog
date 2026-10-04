@@ -14,9 +14,9 @@ The tool is a single static HTML page with no server and no external API. The ch
 |---|---|
 | Digits read correctly | 22,491 of 22,491 (100 %) |
 | Wrong digits shown as confident | 0 |
-| Digits flagged for a quick check | 0.04 % (NAIPS), 0.01 % (BoM) |
+| Digits flagged for a quick check | 0.04 % (NAIPS), 0.02 % (BoM) |
 
-That is about one flagged digit every five charts across the whole 20 box area. A route only uses a few boxes, so most flights see none.
+That is 6 flagged digits across all 27 charts, over the whole 20 box area. A route only uses a few boxes, so most flights see none.
 
 Both chart sources are supported:
 
@@ -52,10 +52,10 @@ Every component is rebuilt from scratch at each retrain, separately for each lay
 
 | Component | Content | Size in page |
 |---|---|---|
-| Glyph bank | 59 digit exemplars across black, red and blue text, selected for maximum diversity | 14 KB |
+| Glyph bank | 59 digit exemplars across black, red and blue text, selected for maximum diversity. Red and blue digits share one ink picture, so a digit missing in one temperature group is borrowed from another | 14 KB |
 | See through map | Paper colour under the coastline for 1,522 pixels | 10 KB |
 | Position memory | 1,226 real digit appearances at 261 coastline positions | 227 KB |
-| Virtual memory | Coastline cover and green level for 11,088 pixels, plus 154 clean digit appearances | 70 KB |
+| Virtual memory | Coastline cover and green level for 11,088 pixels, plus the clean appearance of every digit in black, red and blue. Red and blue are exact recolourings of the black digit, so a colour never seen can still be drawn | 77 KB |
 
 ### Validation protocol
 
@@ -74,10 +74,10 @@ Three measures are reported:
 | Source | Charts | Digits | Correct | Flagged | Silent errors |
 |---|---|---|---|---|---|
 | NAIPS | 13 | 10,829 | 10,829 | 4 (0.04 %) | 0 |
-| BoM | 14 | 11,662 | 11,662 | 1 (0.01 %) | 0 |
-| Total | 27 | 22,491 | 22,491 (100 %) | 5 (0.02 %) | 0 |
+| BoM | 14 | 11,662 | 11,662 | 2 (0.02 %) | 0 |
+| Total | 27 | 22,491 | 22,491 (100 %) | 6 (0.03 %) | 0 |
 
-23 of the 27 charts produced no flag at all, and all 2,715 coastline affected digits were read correctly. With zero errors in 22,491 digits, the true error rate is below 0.014 % (about 1 in 7,500) at 95 % confidence.
+22 of the 27 charts produced no flag at all, and all 2,715 coastline affected digits were read correctly. With zero errors in 22,491 digits, the true error rate is below 0.014 % (about 1 in 7,500) at 95 % confidence.
 
 ### Contribution of each stage
 
@@ -86,11 +86,24 @@ Same protocol and data, adding one stage at a time:
 | Stage | Flagged | Wrong digits | Silent errors |
 |---|---|---|---|
 | Template matching, fixed confidence rule | 6.41 % | 14 | 0 |
-| + confidence scaled by coastline coverage | 4.78 % | 14 | 0 |
-| + position memory | 0.92 % | 14 | 0 |
-| + virtual memory | 0.02 % | 0 | 0 |
+| + stricter confidence near the coastline | 7.09 % | 14 | 0 |
+| + position memory | 1.60 % | 14 | 0 |
+| + virtual memory | 0.03 % | 0 | 0 |
 
-The virtual memory removes 97.6 % of the remaining flags (206 to 5) and corrects all 14 wrong first readings, because it can recognise a digit under the coastline even at a position where that digit was never seen.
+The stricter rule near the coastline deliberately flags more, because a green line grazing the edge of a digit can hide a stroke. The virtual memory then removes 98.3 % of the remaining flags (359 to 6) and corrects all 14 wrong first readings, because it can recognise a digit under the coastline even at a position where that digit was never seen.
+
+### Generalisation tests
+
+These tests check how the engine copes with values and positions it has never met, as a new season would bring.
+
+| Test | Setup | Digits | Correct | Flagged | Silent errors |
+|---|---|---|---|---|---|
+| New weather | Trained on the first 7 valid times, tested on the last 7 | 11,662 | 99.94 % (7 wrong, all flagged) | 0.08 % | 0 |
+| New value at a coastline spot | Coastline digits whose value never appeared at that position in training | 446 | 100 % | 0 % | 0 |
+| Unknown positions | The 61 boxes outside the planning area, never used for training and with no coastline map | 67,095 | 99.84 % (111 wrong, all flagged) | 1.45 % | 0 |
+| Unseen temperature digit | Tens digit 1 removed from training in red and blue, standing in for a summer +2x or a winter −2x | 695 | 100 % | 1.3 % | 0 |
+
+In every test, an unfamiliar situation produced more flags, never a confident wrong value.
 
 ### Prospective testing
 
@@ -102,7 +115,8 @@ A Python reference implementation is used for training and testing. Every releas
 
 1. Prospective test of the current build on the newly issued charts.
 2. Cross validation on the full dataset with zero silent errors.
-3. Browser parity: the page must reproduce the reference readings and flags exactly (latest: 3,240 of 3,240 lines identical).
+3. Generalisation tests with zero silent errors.
+4. Browser parity: the page must reproduce the reference readings and flags exactly on every box of every chart (latest: 13,122 of 13,122 lines identical).
 
 ## Privacy
 
