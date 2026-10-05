@@ -2,7 +2,9 @@
 
 Reads the BoM GPWT low level chart (SA) from image and turns the selected grid boxes into wind values ready for the NavLog_v12 sheet.
 
-Built by SJX12.
+Open the tool: https://sjx012.github.io/WindToLog/
+
+Built by SJX12 for Starlux cadets flying at FTA.
 
 ## Overview
 
