@@ -10,13 +10,13 @@ Built by SJX12 for Starlux cadets flying at FTA.
 
 The tool is a single static HTML page with no server and no external API. The chart image is processed entirely in the browser using a purpose built OCR engine designed for this one chart format. Values are read box by box, checked for confidence, and combined into a route wind using vector averaging.
 
-**Accuracy.** In held out testing on 57 charts (47,481 digits), each chart read using only what was learned from the others:
+**Accuracy.** In held out testing on 69 charts (57,477 digits), each chart read using only what was learned from the others:
 
 | Measure | Result |
 |---|---|
-| Digits read correctly | 47,480 of 47,481 (99.998 %) |
+| Digits read correctly | 57,476 of 57,477 (99.998 %) |
 | Wrong digits shown as confident | 0 |
-| Digits flagged for a quick check | 0.02 % (NAIPS), 0.01 % (BoM) |
+| Digits flagged for a quick check | 0.04 % (NAIPS), 0.01 % (BoM) |
 
 A route only uses a few boxes, so most flights see no flag at all.
 
@@ -33,7 +33,7 @@ Retina screenshots at 2x or 3x are scaled back to chart resolution. Other zoom l
 
 ### Ground truth
 
-Every label comes from the text layer embedded in the official BoM GPWT PDF, paired with the PNG charts of the same valid time. No label is entered by hand. The current dataset holds 57 chart images (28 NAIPS, 29 BoM) and 96,222 labelled digits.
+Every label comes from the text layer embedded in the official BoM GPWT PDF, paired with the PNG charts of the same valid time. No label is entered by hand. The current dataset holds 69 chart images (34 NAIPS, 35 BoM) and 116,130 labelled digits.
 
 ### What is learned
 
@@ -55,19 +55,19 @@ The key safety measure is the silent error, a wrong digit that is not flagged. T
 
 | Source | Charts | Digits | Correct | Flagged | Silent errors |
 |---|---|---|---|---|---|
-| NAIPS | 28 | 23,324 | 23,323 | 5 (0.02 %) | 0 |
-| BoM | 29 | 24,157 | 24,157 | 3 (0.01 %) | 0 |
-| Total | 57 | 47,481 | 47,480 (99.998 %) | 8 (0.02 %) | 0 |
+| NAIPS | 34 | 28,322 | 28,321 | 10 (0.04 %) | 0 |
+| BoM | 35 | 29,155 | 29,155 | 4 (0.01 %) | 0 |
+| Total | 69 | 57,477 | 57,476 (99.998 %) | 14 (0.02 %) | 0 |
 
-The one wrong digit was flagged. With zero silent errors in 47,481 digits, the true silent error rate is below 0.01 % at 95 % confidence.
+The one wrong digit was flagged. With zero silent errors in 57,477 digits, the true silent error rate is below 0.01 % at 95 % confidence.
 
 ### Contribution of each stage
 
 | Stage | Flagged | Wrong digits | Silent errors |
 |---|---|---|---|
-| Template matching, fixed confidence rule | 6.81 % | 39 | 14 |
-| + stricter confidence near the coastline | 7.10 % | 39 | 0 |
-| + position memory | 1.18 % | 39 | 0 |
+| Template matching, fixed confidence rule | 6.76 % | 36 | 14 |
+| + stricter confidence near the coastline | 7.05 % | 36 | 0 |
+| + position memory | 1.07 % | 36 | 0 |
 | + virtual memory | 0.02 % | 1 | 0 |
 
 ### Generalisation
@@ -76,10 +76,10 @@ How the engine copes with values and positions it has never met, as a new season
 
 | Test | Digits | Correct | Silent errors |
 |---|---|---|---|
-| Trained on older charts, tested on newer ones | 24,990 | 99.996 % | 0 |
-| A value never seen at that coastline spot | 614 | 99.8 % | 0 |
-| Boxes outside the trained area, with no coastline map | 141,645 | 99.88 % | 0 |
-| A temperature digit never seen in red or blue | 1,747 | 100 % | 0 |
+| Trained on older charts, tested on newer ones | 29,988 | 99.997 % | 0 |
+| A value never seen at that coastline spot | 645 | 99.8 % | 0 |
+| Boxes outside the trained area, with no coastline map | 171,465 | 99.88 % | 0 |
+| A temperature digit never seen in red or blue | 2,491 | 100 % | 0 |
 
 An unfamiliar situation produces more flags, never a confident wrong value.
 
